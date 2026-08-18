@@ -202,23 +202,33 @@ if [[ "${NUM_BER}" == "1" ]]; then
   max_retries=5
   retry=0
   while [ $retry -lt $max_retries ]; do
-    if git clone -b "${REPO_BRANCH}" --single-branch "${REPO_URL}" "${tmpdir}" 2>/dev/null; then
-      # 成功则跳出循环
+    # 如果 tmpdir 已存在且是 Git 仓库，尝试续传
+    if [ -d "${tmpdir}/.git" ]; then
+      cd "${tmpdir}"
+      if git pull --depth=1 --ff-only origin "${REPO_BRANCH}" 2>/dev/null; then
+        cd "${GITHUB_WORKSPACE}"
+        break
+      else
+        cd "${GITHUB_WORKSPACE}"
+        rm -rf "${tmpdir}"
+        tmpdir="$(mktemp -d)"
+      fi
+    fi
+
+    # 尝试全新 clone
+    if git clone -b "${REPO_BRANCH}" --single-branch --depth=1 "${REPO_URL}" "${tmpdir}"; then
       break
     else
       retry=$((retry+1))
       if [ $retry -lt $max_retries ]; then
         TIME r "下载失败，第 ${retry} 次重试（共 ${max_retries} 次），等待 3 秒..."
         sleep 3
-        rm -rf "${tmpdir}"  # 删除可能残留的目录
-        tmpdir="$(mktemp -d)"
       else
-        TIME r "源码下载失败,已达最大重试次数"
+        TIME r "源码下载失败，已达最大重试次数"
         exit 1
       fi
     fi
   done
-  # 下载成功后的操作
   rm -rf openwrt
   cp -Rf $tmpdir $HOME_PATH
   rm -rf $tmpdir
@@ -230,17 +240,26 @@ elif [[ "${NUM_BER}" == "2" ]]; then
   max_retries=5
   retry=0
   while [ $retry -lt $max_retries ]; do
-    if git clone -b "${REPO_BRANCH}" --single-branch "${REPO_URL}" "${tmpdir}" 2>/dev/null; then
+    if [ -d "${tmpdir}/.git" ]; then
+      cd "${tmpdir}"
+      if git pull --depth=1 --ff-only origin "${REPO_BRANCH}" 2>/dev/null; then
+        cd "${GITHUB_WORKSPACE}"
+        break
+      else
+        cd "${GITHUB_WORKSPACE}"
+        rm -rf "${tmpdir}"
+        tmpdir="$(mktemp -d)"
+      fi
+    fi
+    if git clone -b "${REPO_BRANCH}" --single-branch --depth=1 "${REPO_URL}" "${tmpdir}"; then
       break
     else
       retry=$((retry+1))
       if [ $retry -lt $max_retries ]; then
         TIME r "同步失败，第 ${retry} 次重试（共 ${max_retries} 次），等待 3 秒..."
         sleep 3
-        rm -rf "${tmpdir}"
-        tmpdir="$(mktemp -d)"
       else
-        TIME r "源码同步失败,已达最大重试次数"
+        TIME r "源码同步失败，已达最大重试次数"
         exit 1
       fi
     fi
