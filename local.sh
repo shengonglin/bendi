@@ -199,84 +199,37 @@ cd ${GITHUB_WORKSPACE}
 if [[ "${NUM_BER}" == "1" ]]; then
   TIME y "正在执行：下载${SOURCE}-${LUCI_EDITION}源码中，请耐心等候..."
   tmpdir="$(mktemp -d)"
-  max_retries=5
-  retry=0
-  while [ $retry -lt $max_retries ]; do
-    # 如果 tmpdir 已存在且是 Git 仓库，尝试续传
-    if [ -d "${tmpdir}/.git" ]; then
-      cd "${tmpdir}"
-      if git pull --depth=1 --ff-only origin "${REPO_BRANCH}" 2>/dev/null; then
-        cd "${GITHUB_WORKSPACE}"
-        break
-      else
-        cd "${GITHUB_WORKSPACE}"
-        rm -rf "${tmpdir}"
-        tmpdir="$(mktemp -d)"
-      fi
-    fi
-
-    # 尝试全新 clone
-    if git clone -b "${REPO_BRANCH}" --single-branch --depth=1 "${REPO_URL}" "${tmpdir}"; then
-      break
-    else
-      retry=$((retry+1))
-      if [ $retry -lt $max_retries ]; then
-        TIME r "下载失败，第 ${retry} 次重试（共 ${max_retries} 次），等待 3 秒..."
-        sleep 3
-      else
-        TIME r "源码下载失败，已达最大重试次数"
-        exit 1
-      fi
-    fi
-  done
-  rm -rf openwrt
-  cp -Rf $tmpdir $HOME_PATH
-  rm -rf $tmpdir
-  source $COMMON_SH && Diy_feedsconf
-  TIME g "源码下载完成"
+  if git clone -b "${REPO_BRANCH}" --single-branch "${REPO_URL}" "${tmpdir}"; then
+    rm -rf openwrt
+    cp -Rf $tmpdir $HOME_PATH
+    rm -rf $tmpdir
+    source $COMMON_SH && Diy_feedsconf
+    TIME g "源码下载完成"
+  else
+    TIME r "源码下载失败,请检测网络"
+    exit 1
+  fi
 elif [[ "${NUM_BER}" == "2" ]]; then
   TIME y "正在同步上游源码(${SOURCE}-${LUCI_EDITION})"
   tmpdir="$(mktemp -d)"
-  max_retries=5
-  retry=0
-  while [ $retry -lt $max_retries ]; do
-    if [ -d "${tmpdir}/.git" ]; then
-      cd "${tmpdir}"
-      if git pull --depth=1 --ff-only origin "${REPO_BRANCH}" 2>/dev/null; then
-        cd "${GITHUB_WORKSPACE}"
-        break
-      else
-        cd "${GITHUB_WORKSPACE}"
-        rm -rf "${tmpdir}"
-        tmpdir="$(mktemp -d)"
-      fi
-    fi
-    if git clone -b "${REPO_BRANCH}" --single-branch --depth=1 "${REPO_URL}" "${tmpdir}"; then
-      break
-    else
-      retry=$((retry+1))
-      if [ $retry -lt $max_retries ]; then
-        TIME r "同步失败，第 ${retry} 次重试（共 ${max_retries} 次），等待 3 秒..."
-        sleep 3
-      else
-        TIME r "源码同步失败，已达最大重试次数"
-        exit 1
-      fi
-    fi
-  done
-  cd $HOME_PATH
-  find . -maxdepth 1 \
-    ! -name '.' \
-    ! -name 'feeds' \
-    ! -name 'dl' \
-    ! -name 'build_dir' \
-    ! -name 'staging_dir' \
-    ! -name 'LICENSES' \
-    ! -name '.config' \
-    ! -name '.config.old' \
-    -exec rm -rf {} +
-  rsync -a $tmpdir/ $HOME_PATH/
-  rm -rf $tmpdir
+  if git clone -b "${REPO_BRANCH}" --single-branch "${REPO_URL}" "${tmpdir}"; then
+    cd $HOME_PATH
+    find . -maxdepth 1 \
+      ! -name '.' \
+      ! -name 'feeds' \
+      ! -name 'dl' \
+      ! -name 'build_dir' \
+      ! -name 'staging_dir' \
+      ! -name 'LICENSES' \
+      ! -name '.config' \
+      ! -name '.config.old' \
+      -exec rm -rf {} +
+    rsync -a $tmpdir/ $HOME_PATH/
+    rm -rf $tmpdir
+  else
+    TIME r "源码下载失败,请检查网络"
+    exit 1
+  fi
 elif [[ "${NUM_BER}" == "3" ]]; then
   cd $HOME_PATH
   TIME y "正在执行：更新和安装feeds"
